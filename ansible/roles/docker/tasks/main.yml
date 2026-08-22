@@ -48,12 +48,59 @@
 # `docker info` talks to the daemon, unlike `docker --version` which only reports
 # the client and would pass even with the service stopped. {% raw %} stops Jinja
 # from trying to evaluate Docker's Go template.
-- name: Confirm the engine responds
+#
+# Note that it exits 0 even when it cannot reach the daemon, printing the error
+# to stderr and leaving ServerVersion empty -- so the return code proves nothing
+# here and the output is what has to be checked.
+- name: Ask the daemon for its version
   ansible.builtin.command: docker info --format '{% raw %}{{.ServerVersion}}{% endraw %}'
   register: docker_server_version
   changed_when: false
+  failed_when: false
   become: true
+
+# Upgrading docker.io replaces the binary on disk but leaves the running daemon
+# executing the old code, so the new client speaks an API version the old daemon
+# rejects. Nothing in this role causes that -- unattended-upgrades does, on its
+# own schedule -- which is why the role has to cope with it rather than assume a
+# daemon it started is a daemon it can talk to.
+#
+# Hit in practice when restoring the apt suites let seventeen days of deferred
+# updates land at once, taking docker.io from 24.0.7 to 29.1.3. Every subsequent
+# deployment failed with "client version 1.52 is too new".
+- name: Restart Docker when the daemon does not answer
+  ansible.builtin.systemd_service:
+    name: "{{ docker_service_name }}"
+    state: restarted
+  become: true
+  when: docker_server_version.stdout | trim | length == 0
+
+- name: Ask again after the restart
+  ansible.builtin.command: docker info --format '{% raw %}{{.ServerVersion}}{% endraw %}'
+  register: docker_server_version_retry
+  changed_when: false
+  become: true
+  when: docker_server_version.stdout | trim | length == 0
+
+- name: Settle on whichever answer we got
+  ansible.builtin.set_fact:
+    docker_engine_version: >-
+      {{ (docker_server_version_retry.stdout
+          if docker_server_version.stdout | trim | length == 0
+          else docker_server_version.stdout) | trim }}
+
+# A daemon that still will not answer after a restart is a broken node, not a
+# transient. Say so here rather than letting the monitoring role fail later with
+# an error about API versions that describes the symptom and not the cause.
+- name: Fail if the engine is still unreachable
+  ansible.builtin.fail:
+    msg: >-
+      The Docker daemon is not answering even after a restart. The client is
+      installed and the service is up, so the likely cause is a package upgrade
+      the running daemon has not picked up, or a daemon that failed to start.
+      Check `journalctl -u {{ docker_service_name }} -n 50` on the node.
+  when: docker_engine_version | length == 0
 
 - name: Report the installed engine version
   ansible.builtin.debug:
-    msg: "Docker engine {{ docker_server_version.stdout }} is running"
+    msg: "Docker engine {{ docker_engine_version }} is running"
