@@ -12,11 +12,13 @@ What is built, what is next, what is deliberately not being built. History lives
 | VM provisioning | PowerShell + `VBoxManage` | ✅ NAT, `virtio`, port-forwards |
 | OS installation | cloud-init / Subiquity | ⚠️ Works, one known race — R1 |
 | Connectivity | PowerShell | ✅ |
-| Configuration | Ansible (from WSL) | ✅ Three roles, `changed=0` on a second run |
+| Configuration | Ansible (from WSL) | ✅ Four roles, `changed=0` on a second run |
 | Observability | Prometheus / Grafana / node_exporter | ✅ Verified scraping the VM, not the container |
-| Alerting | Prometheus rules / Alertmanager | ✅ Five rules, grouped and routed to Discord, each linked to a runbook and unit-tested with `promtool test rules` |
+| Alerting | Prometheus rules / Alertmanager | ✅ Six rules, grouped and routed to Discord, each linked to a runbook and unit-tested with `promtool test rules` |
 | Remote access | Tailscale | ✅ Unattended with a pre-authorised key |
 | CI | GitHub Actions | ⚠️ Five jobs. The rules are behaviour-tested; the pipeline itself is not — R3 |
+| Acceptance gate | stencil-bench via Ansible | ✅ Node refused below 12 GB/s; `changed=0` on a second run |
+| Performance regression | Prometheus rule + Grafana panel | ✅ `StencilThroughputRegressed`, unit-tested and mutation-checked |
 
 ---
 

@@ -203,10 +203,10 @@ Seven gates on every push and PR, in five parallel jobs. All must pass.
 | **Lint** | `Invoke-ScriptAnalyzer` over every script, and that `config/node.json` has every key the stages read |
 | **Unit tests** | `Pester` against `Get-LabConfig`, the one script with logic rather than side effects |
 | **Compose** | `docker compose config` against `.env.example` |
-| **Ansible** | `--syntax-check` and `ansible-lint` over the playbook and all three roles |
+| **Ansible** | `--syntax-check` and `ansible-lint` over the playbook and all four roles |
 | **Secret scan** | `gitleaks` across the full history, not just the tip |
 | **Observability config** | `promtool` and `amtool` over the Prometheus and Alertmanager configs, cloud-init, the dashboard, and the [runbook](docs/RUNBOOK.md) links |
-| **Alert behaviour** | Synthetic series driven through the five rules: each must fire when it should, and stay quiet when it should not |
+| **Alert behaviour** | Synthetic series driven through the six rules: each must fire when it should, and stay quiet when it should not |
 
 Dependabot proposes updates monthly, for Actions and the pinned images.
 
