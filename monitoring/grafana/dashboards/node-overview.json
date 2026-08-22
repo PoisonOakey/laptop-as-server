@@ -2,30 +2,53 @@
   "uid": "ztp-node-overview",
   "title": "Node Overview",
   "description": "Host health for the ZTP node. Panels intentionally mirror monitoring/alert_rules.yml, so what is watched here and what pages are the same signals.",
-  "tags": ["ztp", "node"],
+  "tags": [
+    "ztp",
+    "node"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "30s",
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "panels": [
     {
       "id": 1,
       "type": "stat",
       "title": "node_exporter",
       "description": "Mirrors the TargetDown alert. Stop the container and this flips to DOWN within one scrape.",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "up{job=\"node_exporter\"}",
           "instant": true
         }
       ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "colorMode": "background",
         "graphMode": "none",
         "textMode": "value"
@@ -33,10 +56,36 @@
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "DOWN", "color": "red", "index": 0 } } },
-            { "type": "value", "options": { "1": { "text": "UP", "color": "green", "index": 1 } } }
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "UP",
+                  "color": "green",
+                  "index": 1
+                }
+              }
+            }
           ],
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }] }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       }
@@ -46,12 +95,23 @@
       "type": "gauge",
       "title": "Memory available",
       "description": "MemAvailable, not MemFree. Free memory excludes reclaimable cache and reads alarmingly low on a healthy host. Alert fires below 10%.",
-      "gridPos": { "h": 8, "w": 9, "x": 6, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100",
           "instant": true
         }
@@ -64,9 +124,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": 10 },
-              { "color": "green", "value": 25 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 10
+              },
+              {
+                "color": "green",
+                "value": 25
+              }
             ]
           }
         },
@@ -78,12 +147,23 @@
       "type": "gauge",
       "title": "Root filesystem free",
       "description": "Alert fires below 15%. A second alert uses predict_linear to catch a disk filling fast while still above the threshold.",
-      "gridPos": { "h": 8, "w": 9, "x": 15, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 9,
+        "x": 15,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"} * 100",
           "instant": true
         }
@@ -96,9 +176,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": 15 },
-              { "color": "green", "value": 30 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 15
+              },
+              {
+                "color": "green",
+                "value": 30
+              }
             ]
           }
         },
@@ -109,23 +198,43 @@
       "id": 4,
       "type": "stat",
       "title": "Uptime",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "time() - node_boot_time_seconds",
           "instant": true
         }
       ],
       "options": {
-        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
         "colorMode": "none",
         "graphMode": "none"
       },
       "fieldConfig": {
-        "defaults": { "unit": "s", "decimals": 0 },
+        "defaults": {
+          "unit": "s",
+          "decimals": 0
+        },
         "overrides": []
       }
     },
@@ -134,18 +243,32 @@
       "type": "timeseries",
       "title": "Load average per core",
       "description": "Divided by core count so the threshold holds regardless of how the VM is sized. Alert fires above 2 sustained for 15 minutes.",
-      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "node_load1 / count without (cpu, mode) (node_cpu_seconds_total{mode=\"idle\"})",
           "legendFormat": "1m"
         },
         {
           "refId": "B",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "node_load15 / count without (cpu, mode) (node_cpu_seconds_total{mode=\"idle\"})",
           "legendFormat": "15m"
         }
@@ -154,7 +277,10 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "custom": { "lineWidth": 2, "fillOpacity": 8 }
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
         },
         "overrides": []
       }
@@ -164,12 +290,23 @@
       "type": "timeseries",
       "title": "CPU utilisation by mode",
       "description": "Rate of time spent in each CPU mode, averaged across cores. iowait rising while idle stays low usually means disk, not CPU.",
-      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "avg by (mode) (rate(node_cpu_seconds_total{mode!=\"idle\"}[5m])) * 100",
           "legendFormat": "{{mode}}"
         }
@@ -178,9 +315,107 @@
         "defaults": {
           "unit": "percent",
           "min": 0,
-          "custom": { "lineWidth": 1, "fillOpacity": 20, "stacking": { "mode": "normal" } }
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 20,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
         },
         "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Memory bandwidth (GB/s)",
+      "description": "Achieved memory bandwidth from stencil-bench, re-measured daily by a systemd timer. The dashed line is the StencilThroughputRegressed condition -- 85% of the 7-day best -- so the alert is visible before it fires rather than only after. The red threshold at 12 is the acceptance floor a node must clear at provisioning; a node below it would have been refused.",
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "stencil_bandwidth_gbytes_per_second",
+          "legendFormat": "{{kernel}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max_over_time(stencil_bandwidth_gbytes_per_second[7d]) * 0.85",
+          "legendFormat": "alert threshold (85% of 7d best)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "decimals": 2,
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "axisLabel": "GB/s"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 12
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "alert threshold (85% of 7d best)"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
       }
     }
   ]
