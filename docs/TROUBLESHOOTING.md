@@ -82,7 +82,20 @@ This block must be present in `user-data`:
   apt:
     disable_suites: [updates, security]
 ```
-*(You can safely run `apt update && apt upgrade` via SSH after the machine boots normally.)*
+**`disable_suites` is not scoped to the installer.** It is written through to the installed system's `/etc/apt/sources.list.d/ubuntu.sources`, so the node boots with `noble-updates` and `noble-security` missing and stays that way. Two consequences, and this document previously claimed the opposite:
+
+- **The node never receives a security update.** `apt update && apt upgrade` after first boot fetches nothing, because the suites carrying the updates are not in the sources.
+- **Ordinary package installs fail.** A point-release ISO (`24.04.4`) carries packages from `noble-updates`, so their installed versions cannot be resolved against the release pocket alone. Installing `build-essential` fails with `E: Unable to correct problems, you have held broken packages` and a list of `gcc-14-base` version mismatches.
+
+`late-commands` in `user-data` now restores both suites on the target before first boot, so the install stays offline while the running node does not. To repair a node provisioned before that change:
+
+```bash
+sudo sed -i 's|^Suites: noble noble-backports$|Suites: noble noble-updates noble-backports|' /etc/apt/sources.list.d/ubuntu.sources
+printf '\nTypes: deb\nURIs: http://security.ubuntu.com/ubuntu/\nSuites: noble-security\nComponents: main universe restricted multiverse\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' | sudo tee -a /etc/apt/sources.list.d/ubuntu.sources > /dev/null
+sudo apt update
+```
+
+Confirm with `grep '^Suites:' /etc/apt/sources.list.d/ubuntu.sources` — you want both `noble noble-updates noble-backports` and `noble-security`.
 
 ---
 

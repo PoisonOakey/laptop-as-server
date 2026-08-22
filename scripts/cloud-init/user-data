@@ -29,9 +29,24 @@ autoinstall:
     grub_pc_install_devices:
       - /dev/sda
 
+  # Keeps the *installation* off the network mirrors, which is what fixes the
+  # silent apt hang in TROUBLESHOOTING.md #4. It is an install-time measure only
+  # -- late-commands below put both suites back before first boot.
   apt:
     disable_suites: [updates, security]
 
-  # Power off the VM when installation is complete
   late-commands:
+    # disable_suites is not scoped to the installer: it is written through to the
+    # installed system's sources, and left alone the node would never receive a
+    # security update. It also breaks ordinary package installs -- a point-release
+    # ISO carries packages from noble-updates, so their exact versions become
+    # unresolvable once that suite is gone, and anything depending on them fails
+    # with "held broken packages". Restored here rather than by dropping
+    # disable_suites, because the install must stay offline for #4.
+    # Each command ends in `exit 0`: a failing late-command aborts the whole
+    # unattended install, and no repair of sources is worth that.
+    - 'curtin in-target --target=/target -- sh -c "sed -i ''s/^Suites: noble noble-backports$/Suites: noble noble-updates noble-backports/'' /etc/apt/sources.list.d/ubuntu.sources; exit 0"'
+    - 'curtin in-target --target=/target -- sh -c "grep -q noble-security /etc/apt/sources.list.d/ubuntu.sources || printf ''\nTypes: deb\nURIs: http://security.ubuntu.com/ubuntu/\nSuites: noble-security\nComponents: main universe restricted multiverse\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n'' >> /etc/apt/sources.list.d/ubuntu.sources; exit 0"'
+
+    # Power off the VM when installation is complete
     - "poweroff"
