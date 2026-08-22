@@ -2,7 +2,7 @@
   "vm_name": "SRE-Node-01",
   "lab_dir": "$HOME\\server-lab",
   "iso_url": "https://releases.ubuntu.com/24.04/ubuntu-24.04.4-live-server-amd64.iso",
-  "ram_mb": 4096,
+  "ram_mb": 3072,
   "cpu_cores": 2,
   "disk_size_mb": 25600
 }
