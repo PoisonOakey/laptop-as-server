@@ -1,0 +1,21 @@
+{{ ansible_managed | comment }}
+# Schedules the measurement above.
+
+[Unit]
+Description=Run stencil-bench {{ acceptance_timer_schedule }}
+Documentation=https://github.com/PoisonOakey/stencil-bench
+
+[Timer]
+OnCalendar={{ acceptance_timer_schedule }}
+
+# Without a spread, every node in a fleet measures at exactly the same instant --
+# and since the benchmark saturates memory bandwidth, that is the one moment they
+# would all contend with each other and report a dip that is not real.
+RandomizedDelaySec={{ acceptance_timer_randomized_delay }}
+
+# A node that was powered off through its scheduled slot should still produce a
+# figure rather than leaving a gap in the series that looks like a failed scrape.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

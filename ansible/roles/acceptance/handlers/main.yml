@@ -1,0 +1,8 @@
+---
+# systemd caches unit files, so an edited .service or .timer has no effect until
+# it is told to re-read them. Only on change, so a no-op run stays a no-op.
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  become: true

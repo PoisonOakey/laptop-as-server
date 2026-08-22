@@ -1,0 +1,36 @@
+{{ ansible_managed | comment }}
+# Re-measures the node and refreshes the metrics node_exporter's textfile
+# collector publishes. This is the drift half of the story -- the provisioning
+# gate decides whether a node joins the fleet, this catches it slowing down
+# afterwards.
+#
+# No --check here on purpose. A node already in service that has slowed down is
+# an alert, not a unit that should start failing: a failing timer is noticed by
+# whoever reads systemd, while a Prometheus alert is noticed by whoever is on
+# call. StencilThroughputRegressed owns that decision.
+
+[Unit]
+Description=stencil-bench memory bandwidth measurement
+Documentation=https://github.com/PoisonOakey/stencil-bench
+After=network.target
+
+[Service]
+Type=oneshot
+User={{ ansible_user }}
+WorkingDirectory={{ acceptance_dest }}
+ExecStart={{ acceptance_dest }}/build/bench \
+    --nx {{ acceptance_nx }} --ny {{ acceptance_ny }} \
+    --steps {{ acceptance_steps }} --repeats {{ acceptance_repeats }} \
+    --kernel {{ acceptance_kernel }} \
+    --prom-file {{ acceptance_prom_file }}
+
+# The benchmark deliberately saturates memory bandwidth for the duration of the
+# run. Deprioritising it keeps a scheduled measurement from competing with
+# whatever the node actually exists to do -- at the cost of the figure being
+# slightly pessimistic on a busy node, which is the right way round for
+# something watching for slowdowns.
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

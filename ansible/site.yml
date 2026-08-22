@@ -44,3 +44,14 @@
     # Replaces 05-setup-tailscale.ps1. Reports what to do rather than pretending
     # to automate device approval -- see the role's defaults.
     - tailscale
+
+    # Last, and last for a reason. This is the performance gate: it measures the
+    # node and fails the play if the machine cannot clear the floor. Running it
+    # earlier would mean a slow node never gets its monitoring stack, and a node
+    # rejected without monitoring is a node you cannot then investigate.
+    #
+    # Being last also makes the measurement honest about the worst case -- it
+    # runs immediately after every other role has finished working the machine,
+    # which is the least quiet moment the node will see. The floor is sized for
+    # that; see the role's defaults.
+    - acceptance

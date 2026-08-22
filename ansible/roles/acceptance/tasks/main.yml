@@ -1,0 +1,145 @@
+---
+# Builds stencil-bench on the node, proves the machine is fast enough, and
+# leaves a timer behind so the same number keeps being reported to Prometheus.
+#
+# The gate deliberately fails the play. A warning that provisioning ignores is
+# not a gate: the whole point is that a node which cannot clear the floor does
+# not quietly become part of the fleet.
+
+- name: Install the build toolchain
+  ansible.builtin.apt:
+    name: "{{ acceptance_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  become: true
+
+# node_exporter bind-mounts this read-only. It is created here rather than by
+# the monitoring role because this is the only thing that writes to it, and a
+# directory owned by whoever writes it is easier to reason about than one owned
+# by whoever reads it.
+- name: Create the node_exporter textfile directory
+  ansible.builtin.file:
+    path: "{{ acceptance_textfile_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0755"
+  become: true
+
+- name: Clone stencil-bench
+  ansible.builtin.git:
+    repo: "{{ acceptance_repo }}"
+    dest: "{{ acceptance_dest }}"
+    version: "{{ acceptance_version }}"
+    # The build directory lives inside the checkout and is gitignored, so a
+    # dirty tree here is expected rather than a sign of local edits.
+    force: false
+  register: acceptance_checkout
+
+- name: Check whether the benchmark has already been built
+  ansible.builtin.stat:
+    path: "{{ acceptance_dest }}/build/bench"
+  register: acceptance_binary
+
+# Rebuilding on every run would make this role report changed=1 forever, and the
+# playbook's acceptance test is that a second consecutive run reports changed=0.
+# Build only when the source moved or the binary is missing.
+- name: Configure the build
+  ansible.builtin.command:
+    cmd: cmake -B build -DCMAKE_BUILD_TYPE=Release
+    chdir: "{{ acceptance_dest }}"
+  when: acceptance_checkout is changed or not acceptance_binary.stat.exists
+  changed_when: true
+
+- name: Compile
+  ansible.builtin.command:
+    cmd: cmake --build build -j {{ ansible_facts['processor_vcpus'] }}
+    chdir: "{{ acceptance_dest }}"
+  when: acceptance_checkout is changed or not acceptance_binary.stat.exists
+  changed_when: true
+
+# Correctness before timing, for the same reason the repository runs it in CI: a
+# benchmark number from a kernel computing the wrong thing is worse than no
+# number, because it looks like a result. With one kernel registered this passes
+# trivially, and it stops doing so the moment a second one is added.
+- name: Verify the kernels agree before believing any timing
+  ansible.builtin.command:
+    cmd: ctest --test-dir build --output-on-failure
+    chdir: "{{ acceptance_dest }}"
+  changed_when: false
+
+# The gate. Writes the .prom file on the same run that decides the verdict, so
+# the number Prometheus scrapes is the number the node was judged on rather than
+# a separate measurement taken moments later.
+#
+# failed_when is false so the next task can report what was actually measured;
+# Ansible's own failure output would give the return code without the figure.
+- name: Measure the node and compare against the floor
+  ansible.builtin.command:
+    cmd: >-
+      ./build/bench
+      --nx {{ acceptance_nx }} --ny {{ acceptance_ny }}
+      --steps {{ acceptance_steps }} --repeats {{ acceptance_repeats }}
+      --kernel {{ acceptance_kernel }}
+      --prom-file {{ acceptance_prom_file }}
+      --check --min-gbytes {{ acceptance_min_gbytes }}
+    chdir: "{{ acceptance_dest }}"
+  register: acceptance_result
+  when: acceptance_run_gate | bool
+  changed_when: false
+  failed_when: false
+
+- name: Capture what the benchmark reported
+  ansible.builtin.set_fact:
+    acceptance_verdict: "{{ acceptance_result.stdout_lines | select('search', '^acceptance:') | first | default('no verdict reported') }}"
+  when: acceptance_run_gate | bool
+
+- name: Refuse the node if it is below the floor
+  ansible.builtin.fail:
+    msg: >-
+      Node rejected by the provisioning performance gate.
+      {{ acceptance_verdict }}
+      The machine is measurably slower than a healthy node, so the thing to
+      suspect is the machine rather than the test. Check memory channel
+      configuration, host contention and thermal throttling before overriding.
+      Exit code {{ acceptance_result.rc }}.
+  when:
+    - acceptance_run_gate | bool
+    - acceptance_result.rc | default(0) != 0
+
+- name: Report the accepted figure
+  ansible.builtin.debug:
+    msg: "{{ acceptance_verdict }}"
+  when: acceptance_run_gate | bool
+
+# Once the node is in service the gate stops being the interesting part -- drift
+# is. The timer re-measures on a schedule and refreshes the .prom file, which is
+# what the StencilThroughputRegressed alert watches.
+- name: Install the benchmark systemd unit
+  ansible.builtin.template:
+    src: stencil-bench.service.j2
+    dest: /etc/systemd/system/stencil-bench.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Reload systemd
+
+- name: Install the benchmark systemd timer
+  ansible.builtin.template:
+    src: stencil-bench.timer.j2
+    dest: /etc/systemd/system/stencil-bench.timer
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: Reload systemd
+
+- name: Enable the benchmark timer
+  ansible.builtin.systemd_service:
+    name: stencil-bench.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true

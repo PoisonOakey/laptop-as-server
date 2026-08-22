@@ -1,0 +1,69 @@
+---
+# The performance gate a node must clear before it is considered provisioned.
+#
+# stencil-bench runs a memory-bound kernel and exits non-zero when the machine
+# is below a floor. This role builds it, runs it, and lets a failure stop the
+# play -- a node that is quietly slow is the thing this exists to catch.
+
+acceptance_repo: "https://github.com/PoisonOakey/stencil-bench.git"
+
+# Pinned rather than tracking main. The floor below was measured against a
+# specific kernel at a specific commit; letting the source move underneath it
+# would silently change what the number means. Bump this and re-derive the floor
+# together, never separately.
+acceptance_version: "main"
+
+acceptance_dest: "/home/{{ ansible_user }}/stencil-bench"
+
+# node_exporter's textfile collector reads every .prom file in this directory.
+# The path is half of the contract with stencil-bench -- see its METHOD.md.
+acceptance_textfile_dir: "/var/lib/node_exporter/textfile"
+acceptance_prom_file: "{{ acceptance_textfile_dir }}/stencil.prom"
+
+acceptance_packages:
+  - build-essential
+  - cmake
+  - git
+
+# Grid and step count. 4096x4096 puts two 64 MB buffers against a 12 MB L3, a
+# working set 10.7x last-level cache, so the kernel reads from memory rather
+# than replaying out of cache. Steps stays at 50: past roughly 55 the diffusion
+# front decays into denormal range and x86 takes a microcode penalty that looks
+# exactly like a regression. See stencil-bench METHOD.md.
+acceptance_nx: 4096
+acceptance_ny: 4096
+acceptance_steps: 50
+acceptance_repeats: 5
+
+# One named kernel, never `all`. The gate reports the best bandwidth across
+# whatever ran, so under `all` the number silently changes meaning every time a
+# kernel is added to the registry and the floor stops referring to what it was
+# measured against.
+acceptance_kernel: "v0_naive"
+
+# The floor, in GB/s.
+#
+# Derived, not chosen. Ten runs of v0_naive on this VM gave a median of
+# 15.20 GB/s and a minimum of 14.85, with a standard deviation of 1.45%. The
+# margin down to 12.0 is about 19% below that minimum and is deliberately
+# generous: this gate fires at the end of provisioning, immediately after the
+# rest of this playbook has been configuring the node and pulling container
+# images, which is the least quiet moment in the pipeline. The ten runs were
+# taken on an idle guest.
+#
+# It still catches what it is for. Memory dropping to single-channel roughly
+# halves achieved bandwidth and serious thermal throttling costs 20-30% -- both
+# land far below 12. Gradual degradation is the alert rule's job, not this one's.
+#
+# Re-derive this whenever acceptance_kernel or acceptance_version changes.
+acceptance_min_gbytes: 12.0
+
+# Set false to build and install the timer without gating the play. Intended for
+# bringing up a node whose expected performance is not yet known -- not for
+# silencing a node that fails.
+acceptance_run_gate: true
+
+# How often the timer re-measures once the node is in service. Daily is enough
+# to catch drift that matters while leaving the node alone the rest of the time.
+acceptance_timer_schedule: "daily"
+acceptance_timer_randomized_delay: "30m"
