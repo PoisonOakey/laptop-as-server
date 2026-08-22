@@ -328,6 +328,69 @@ Note that **Docker Desktop stops working** while the hypervisor is disabled, sin
 
 If the restart demand repeats after rebooting, see the Fast Startup note at the end of item 11.
 
+Note that Docker Desktop re-enables the hypervisor the same way `wsl --install` does, and it does so on install *and* on update. If a host that has been working starts booting the guest at a crawl, that is the first thing to check — see item 17.
+
+---
+
+## 17. VM Fails To Start, Or Boots At A Crawl, On A Host That Worked Yesterday
+
+**Symptoms:**
+
+Two distinct failures with one shared trigger. Both appear only as `VERR_UNRESOLVED_ERROR`, which names neither.
+
+*Failure A — the VM never starts:*
+```
+VBoxManage.exe: error: Unresolved (unknown) host platform error. (VERR_UNRESOLVED_ERROR)
+VBoxManage.exe: error: Details: code E_FAIL (0x80004005), component ConsoleWrap, interface IConsole
+```
+followed by the SSH poll retrying twenty times against a port that will never open.
+
+*Failure B — the VM starts but never finishes booting:* the script reports the forward is open, `ssh` then times out "during banner exchange", and the console sits on an early boot line for ten minutes while `VBoxHeadless` burns a core.
+
+**Root Cause:**
+
+*Failure A is the Windows commit limit, not free RAM.* Commit is the total memory Windows has promised across everything running — physical RAM plus page file. VirtualBox commits the guest's entire RAM at power-on, so a 4 GB guest needs a 4 GB promise (plus a few hundred MB of its own overhead) available in one go, regardless of how much is merely *free*. The VM's own log names it precisely:
+
+```
+Unhandled error 1455
+pgmR3PhysInitAndLinkRamRange failed: ... VERR_UNRESOLVED_ERROR
+```
+
+Windows error 1455 is `ERROR_COMMITMENT_LIMIT`. Observed on a 15.8 GB host with a 20 GB commit limit and 2.1 GB free, against a guest asking for 4 GB. Nothing about the host had changed except what was running on it — Docker Desktop's WSL 2 backend alone held 1.7 GB.
+
+*Failure B is item 16 arriving without the restart demand.* The Windows hypervisor is holding VT-x, so VirtualBox falls back to running as a Hyper-V client. Its log says so plainly:
+
+```
+NEM: NEMR3Init: Snail execution mode is active!
+```
+
+The guest still boots, roughly 25x slower. Booting is thousands of small device operations and each one pays the toll, so a 30-second boot becomes fifteen minutes or never. Note that Virtualization-Based Security keeps the hypervisor loaded even with Hyper-V features off and Docker Desktop closed — check `(Get-CimInstance -ClassName Win32_DeviceGuard -Namespace root\Microsoft\Windows\DeviceGuard).VirtualizationBasedSecurityStatus`, where `2` means enabled and running.
+
+**Resolution:**
+
+`04-connect-node.ps1` now checks both before booting and names whichever is wrong, so neither has to be diagnosed from a VirtualBox error code again.
+
+For Failure A, in order of preference:
+
+| Fix | Trade-off |
+| :--- | :--- |
+| Close what is holding the commit — Docker Desktop first, then `wsl --shutdown` | Free, immediate, temporary |
+| Lower `ram_mb` in `config/node.json` | Permanent, and the node has less headroom |
+| Raise the Windows page file | Permanent and costs only disk. The real fix if the limit is close to installed RAM |
+
+Check what is actually available before blaming the VM:
+```powershell
+[math]::Round((Get-CimInstance Win32_OperatingSystem).FreeVirtualMemory / 1MB, 1)
+```
+
+For Failure B, run `01-host-prep.ps1` as Administrator and reboot — it disables the hypervisor and the conflicting Windows features. If it has already run and `HypervisorPresent` is still `True`, the setting has not taken effect because BCD changes are boot-time only, so the reboot is not optional:
+
+```powershell
+(Get-CimInstance Win32_ComputerSystem).HypervisorPresent   # must be False
+```
+
+**Worth knowing:** stage 04 can be run on its own to wake a node that is merely powered off, and doing so skips stage 01 — which is what re-establishes both conditions. If the host has since gained Docker Desktop or a WSL 2 distribution, stage 04 alone will not save you. That is why the preflight lives in stage 04 rather than only in stage 01.
+
 ---
 
 ## Conclusion
