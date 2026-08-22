@@ -198,3 +198,65 @@ tests:
       - eval_time: 18m
         alertname: HighCpuLoad
         exp_alerts: []
+
+  # --- StencilThroughputRegressed -------------------------------------------
+  # One-minute samples, matching production: the benchmark only refreshes the
+  # .prom file once a day, but node_exporter republishes whatever it holds on
+  # every scrape, so the series is dense rather than daily. Testing it with
+  # hourly samples silently breaks the rule -- Prometheus evaluates each minute
+  # and a series older than the 5m staleness window disappears, resetting the
+  # `for` clock forever. The first version of this test made exactly that
+  # mistake and reported the rule as broken when the test was.
+  #
+  # Ten hours at 16 GB/s set the 7-day best, then the node settles at 13 --
+  # 81.25% of it, past the 15% threshold.
+  - interval: 1m
+    input_series:
+      - series: 'stencil_bandwidth_gbytes_per_second{job="node_exporter", instance="node_exporter:9100", kernel="v0_naive", grid="4096x4096"}'
+        values: '16+0x599 13+0x2399'
+    alert_rule_test:
+      # Twenty hours in, only ten of them slow. One daily measurement is not
+      # enough to wake anyone.
+      - eval_time: 20h
+        alertname: StencilThroughputRegressed
+        exp_alerts: []
+
+      # Thirty hours of sustained regression clears `for: 25h`.
+      - eval_time: 40h
+        alertname: StencilThroughputRegressed
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: node_exporter
+              instance: node_exporter:9100
+              kernel: v0_naive
+              grid: 4096x4096
+            exp_annotations:
+              runbook_url: "https://github.com/PoisonOakey/ztp-linux-node/blob/main/docs/RUNBOOK.md#stencilthroughputregressed"
+              summary: "Memory bandwidth down more than 15% from its 7-day best"
+              description: "node_exporter:9100 kernel v0_naive is at 81.25% of its 7-day best."
+
+  # The false positive the rule is shaped to avoid: one measurement taken while
+  # the node happened to be busy. Twenty-four hours low, then recovered -- one
+  # bad daily run. It must not page anyone, which is the whole reason `for` is
+  # 25 hours and not 25 minutes.
+  - interval: 1m
+    input_series:
+      - series: 'stencil_bandwidth_gbytes_per_second{job="node_exporter", instance="node_exporter:9100", kernel="v0_naive", grid="4096x4096"}'
+        values: '16+0x599 13+0x1439 16+0x999'
+    alert_rule_test:
+      - eval_time: 40h
+        alertname: StencilThroughputRegressed
+        exp_alerts: []
+
+  # Ordinary run-to-run variance is not a regression. 15 against a best of 16 is
+  # 93.75%, inside the threshold and sustained indefinitely -- if the rule fired
+  # on this it would fire on a healthy node forever.
+  - interval: 1m
+    input_series:
+      - series: 'stencil_bandwidth_gbytes_per_second{job="node_exporter", instance="node_exporter:9100", kernel="v0_naive", grid="4096x4096"}'
+        values: '16+0x599 15+0x2399'
+    alert_rule_test:
+      - eval_time: 40h
+        alertname: StencilThroughputRegressed
+        exp_alerts: []

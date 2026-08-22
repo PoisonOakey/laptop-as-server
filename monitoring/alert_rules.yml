@@ -56,6 +56,38 @@ groups:
           summary: "Less than 10% memory available"
           description: "{{ $labels.instance }} has {{ $value | humanizePercentage }} memory available."
 
+      # Relative to the node's own recent best, not a fixed floor -- and that is
+      # the whole point of the rule.
+      #
+      # A fixed threshold is already covered: the acceptance gate refuses a node
+      # below 12 GB/s at provisioning time, which catches gross faults like
+      # memory coming up single-channel. What that cannot catch is a node which
+      # passed at 16 GB/s and now manages 13.5. That is a 15% regression and
+      # still comfortably above any sensible absolute floor, so only a comparison
+      # against its own history sees it.
+      #
+      # `for: 25h` rather than minutes, because the benchmark runs on a daily
+      # timer and node_exporter republishes the same value on every scrape in
+      # between. A shorter window would page on a single measurement, and the
+      # realistic false positive here is one run that happened to land while the
+      # node was busy. Requiring the condition to hold for 25 hours means two
+      # consecutive daily measurements have to agree before anyone is woken.
+      #
+      # Known limitation, worth stating: degradation slower than the 7-day
+      # window drags the baseline down with it and never fires. Hardware that
+      # decays over months is not what this catches.
+      - alert: StencilThroughputRegressed
+        expr: |
+          stencil_bandwidth_gbytes_per_second
+            / max_over_time(stencil_bandwidth_gbytes_per_second[7d]) < 0.85
+        for: 25h
+        labels:
+          severity: warning
+        annotations:
+          runbook_url: "https://github.com/PoisonOakey/ztp-linux-node/blob/main/docs/RUNBOOK.md#stencilthroughputregressed"
+          summary: "Memory bandwidth down more than 15% from its 7-day best"
+          description: "{{ $labels.instance }} kernel {{ $labels.kernel }} is at {{ $value | humanizePercentage }} of its 7-day best."
+
       # Load average per core, so the threshold holds regardless of vCPU count.
       - alert: HighCpuLoad
         expr: |

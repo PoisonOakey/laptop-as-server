@@ -172,6 +172,49 @@ A known self-inflicted cause on this node is a stray `yes > /dev/null` loop left
 
 ---
 
+## StencilThroughputRegressed
+
+**Severity:** warning · fires below 85% of the node's own 7-day best, sustained 25 hours
+
+### What it means
+
+The node is measurably slower at moving memory than it recently was. `stencil-bench` runs on a daily timer and writes its result to node_exporter's textfile collector; this alert compares the latest figure against the best of the last seven days.
+
+It is deliberately relative rather than a fixed floor. The absolute case is already covered — the `acceptance` role refuses a node below 12 GB/s at provisioning time, which catches gross faults like memory coming up single-channel. This catches the case that floor cannot: a node that passed at 16 GB/s and now manages 13.5. That is a real 15% regression while still being comfortably above any sensible fixed threshold.
+
+The `for: 25h` matters. The measurement only refreshes once a day, so 25 hours means two consecutive daily runs both had to be low. One run that landed while the node was busy will not page anyone.
+
+**What it does not catch:** degradation slower than the seven-day window, which drags the baseline down with it. Hardware decaying over months is invisible to this rule by construction.
+
+### Confirm
+
+Look at the series rather than trusting one sample:
+
+```bash
+curl -s 'http://127.0.0.1:9090/api/v1/query?query=stencil_bandwidth_gbytes_per_second' | python3 -m json.tool
+```
+
+Then re-measure by hand, which also tells you whether the regression is reproducible or was a one-off:
+
+```bash
+ssh -p 2222 sysadmin@127.0.0.1   '~/stencil-bench/build/bench --nx 4096 --ny 4096 --steps 50 --repeats 5'
+```
+
+### Fix
+
+Memory bandwidth on this node is shared with the Windows host, so start there:
+
+- **Host contention** — the most likely cause by far. Anything memory-heavy on the host (Docker Desktop's WSL 2 VM, browsers, another VM) competes for the same DRAM. Check the host before the guest
+- **Thermal throttling** — sustained load on a laptop CPU drops clocks. Check whether the host has been busy for hours
+- **Hypervisor mode** — if VirtualBox has fallen back to running under Hyper-V, everything on the node slows down. `(Get-CimInstance Win32_ComputerSystem).HypervisorPresent` must be `False` on the host; see [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) #17
+- **A genuinely busy node** — check `HighCpuLoad` and `MemoryPressure`. The benchmark runs `Nice=10` with idle I/O priority, so it yields to real work and will read low on a node that is legitimately loaded
+
+If the figure is reproducibly lower and the host is quiet, the node has actually degraded. Re-provisioning is the honest response; the acceptance gate will refuse it on the way back in if it has not recovered.
+
+**A false positive worth knowing about:** if the benchmark is rebuilt with a faster kernel, the 7-day best jumps and the old figures look like a regression for a week. Expected, and it clears itself.
+
+---
+
 ## When an alert fires and you disagree with it
 
 Silence it in Alertmanager rather than deleting the rule. A silence is time-boxed and leaves a record; a deleted rule is invisible in three months when the same thing happens again.
