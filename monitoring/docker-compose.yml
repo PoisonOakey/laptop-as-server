@@ -5,7 +5,7 @@
 # a reviewable commit rather than a silent change on the next `compose up`.
 services:
   prometheus:
-    image: prom/prometheus:v3.13.2
+    image: prom/prometheus:v3.14.0
     container_name: prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
